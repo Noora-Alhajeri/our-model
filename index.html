@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:,">
+  <title>Our Model | Anatomy and Motion</title>
+  <link rel="stylesheet" href="./cohort_gallery.css">
+  <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+  <script src="./vendor/lucide.js" defer></script>
+  <script type="module" src="./cohort_gallery.js"></script>
+</head>
+<body>
+  <main class="workspace">
+    <header class="app-header">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"><i data-lucide="scan-line"></i></span><div><h1>Our Model</h1><span class="app-context">Anatomy and motion</span></div></div>
+      <div class="header-controls"><label class="renderer-field"><span class="sr-only">Renderer and simulation mode</span><select id="renderer-select" aria-label="Renderer and simulation mode"><option value="gallery">Browser playback (anatomy fitted)</option><option value="native" disabled>MuJoCo render (same recorded motion)</option><option value="physics" disabled>MuJoCo live physics (push / fall)</option></select></label></div>
+    </header>
+
+    <aside class="sidebar" aria-label="Subject and display settings">
+      <section class="subject-section">
+        <div class="section-heading"><h2>Subject</h2><span id="case-count" class="muted">-- / --</span></div>
+        <div class="subject-tabs" role="tablist" aria-label="Body source">
+          <button id="cohort-tab" type="button" role="tab" aria-selected="true" aria-controls="cohort-panel" tabindex="0">Cohort</button>
+          <button id="measurements-tab" type="button" role="tab" aria-selected="false" aria-controls="measurement-panel" tabindex="-1">Measurements</button>
+        </div>
+        <div id="cohort-panel" role="tabpanel" aria-labelledby="cohort-tab">
+        <label class="field subject-field"><span class="sr-only">Subject</span><select id="subject-select" disabled><option>Loading subjects</option></select></label>
+        <div class="subject-filters">
+          <label class="field age-field"><span>Age parameter</span><select id="age-select" disabled></select></label>
+          <label class="field sex-field"><span>Graphics sex</span><select id="sex-select" disabled></select></label>
+          <label class="field shape-field"><span>Shape weight</span><select id="weight-select" aria-label="Shape weight, dimensionless 0 to 1" title="Body-shape coordinate, not kilograms, BMI or a population percentile" disabled></select></label>
+        </div>
+        </div>
+        <div id="measurement-panel" role="tabpanel" aria-labelledby="measurements-tab" hidden>
+          <form id="measurement-form" novalidate>
+            <div class="measurement-form-heading"><span class="unit-label">Measurements in cm</span><button id="measurement-defaults" type="button" class="icon-button" aria-label="Reset to selected body" data-tooltip="Reset to selected body" disabled><i data-lucide="rotate-ccw"></i></button></div>
+            <div id="pediatric-presets" class="pediatric-presets" hidden>
+              <label class="field"><span>Body preset</span><select id="pediatric-preset" aria-label="Body preset" disabled><option value="">Custom measurements</option></select></label>
+              <p id="pediatric-preset-summary" class="pediatric-size-note" hidden></p>
+              <p id="pediatric-preset-boundary" class="pediatric-size-note" hidden>Height-only graphics target; body proportions and pediatric anatomy are not validated.</p>
+            </div>
+            <div id="measurement-fields" class="measurement-fields"></div>
+            <div class="measurement-actions"><button id="generate-skin" type="submit" class="command-button primary-command" disabled><i data-lucide="scan"></i>Generate skin</button><button id="cancel-generation" type="button" class="icon-button" aria-label="Cancel generation" data-tooltip="Cancel generation" hidden><i data-lucide="x"></i></button></div>
+            <progress id="generation-progress" max="1" hidden aria-label="Body generation progress"></progress>
+            <p id="generation-status" class="generation-status" role="status" aria-live="polite">Connecting to measurement service</p>
+            <p id="generation-error" class="generation-error" role="alert" hidden></p>
+          </form>
+          <div id="generated-layer-actions" class="generated-layer-actions" hidden><button id="add-rig" type="button" class="command-button" disabled><i data-lucide="git-branch"></i>Add rig</button><button id="add-anatomy" type="button" class="command-button" disabled><i data-lucide="bone"></i>Add anatomy</button></div>
+          <div id="measurement-results" class="measurement-results" hidden>
+            <div class="section-heading"><h2>Measurement fit</h2><button id="download-measurements" type="button" class="icon-button" aria-label="Download measurements" data-tooltip="Download measurements"><i data-lucide="download"></i></button></div>
+            <div class="measurement-result-head"><span>Target</span><span>Achieved</span><span>Difference</span></div>
+            <dl id="measurement-residuals" class="measurement-residuals"></dl>
+          </div>
+        </div>
+      </section>
+
+      <section class="measurements-section">
+        <div class="section-heading"><h2>Skin measurements</h2><span class="unit-label">cm</span></div>
+        <dl class="measurements"><div><dt>Vertical extent</dt><dd id="height-value">--</dd></div><div><dt>Torso girth</dt><dd id="torso-value">--</dd></div><div><dt>Thigh girth</dt><dd id="thigh-value">--</dd></div></dl>
+        <div id="pediatric-reference" class="pediatric-reference" hidden><p id="pediatric-extent-summary"></p><p class="pediatric-size-note">Mesh extent is not a clinical length measurement. Age is a graphics parameter, not a verified chronological age.</p><a id="pediatric-source-link" target="_blank" rel="noopener">WHO size reference</a></div>
+      </section>
+
+      <section class="layers-section">
+        <div class="section-heading"><h2>Layers</h2></div>
+        <div class="layer-list">
+          <label class="layer-control"><span><span class="layer-swatch skin-swatch"></span>Skin</span><input id="skin-toggle" type="checkbox" checked></label>
+          <label class="layer-control"><span><span class="layer-swatch rig-swatch"></span>Rig</span><input id="rig-toggle" type="checkbox" checked></label>
+          <label class="layer-control" title="Skeletal anatomy fitted inside the skin: phi_S(x) &lt;= -delta at every bone vertex of every displayed frame"><span><span class="layer-swatch bone-swatch"></span>Anatomy (skeletal)</span><input id="anatomy-toggle" type="checkbox" checked></label>
+          <label class="layer-control" title="700 muscle-tendon units of MS-Human-700, fitted into this skin with the skeleton; each follows the bones it spans"><span><span class="layer-swatch muscle-swatch"></span>Anatomy (muscular)</span><input id="muscles-toggle" type="checkbox"></label>
+          <label class="layer-control" title="Per-muscle activation computed by static optimisation on MS-Human-700 (inverse kinematics, inverse dynamics, estimated ground reactions) for this recorded motion; computed on the MS-Human-700 adult reference body"><span><span class="layer-swatch activation-swatch"></span>Muscle activation (computed)</span><input id="activation-toggle" type="checkbox"></label>
+          <div id="activation-legend" class="activation-legend" hidden><span class="activation-ramp"></span><span class="activation-ticks"><span>0</span><span>10%</span><span>25%</span><span>50%</span><span>100%</span></span><span class="activation-note">colour scale: square root of activation</span></div>
+          <p id="activation-status" class="containment-projection-status" role="status" aria-live="polite"></p>
+          <input id="containment-projection-toggle" type="checkbox" checked hidden>
+        </div>
+        <p id="containment-projection-status" class="containment-projection-status" role="status" aria-live="polite"></p>
+        <label class="opacity-control" for="opacity-slider"><span>Skin opacity</span><output id="opacity-value">35%</output></label>
+        <input id="opacity-slider" class="range-input" type="range" min="5" max="100" value="35" aria-label="Skin opacity">
+      </section>
+
+      <section class="evidence-section" aria-label="Reports and containment checks">
+        <label id="verified-pose-field" class="field" hidden><span>Verified regional poses</span><select id="verified-pose-select"><option value="">Live motion</option></select></label>
+        <p id="verified-pose-status" class="age-warning" role="status" hidden></p>
+        <p id="age-warning" class="age-warning" hidden>Adult-derived anatomy; demonstration motion only</p>
+        <a id="report-link" class="report-link" hidden target="_blank" rel="noopener">Case report<i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+        <div class="containment-entry"><button id="containment-open" type="button" class="command-button" disabled><i data-lucide="scan-search"></i>Check containment</button><span id="containment-summary" role="status" aria-live="polite"></span></div>
+      </section>
+    </aside>
+
+    <section class="viewer" aria-label="Three-dimensional body inspection">
+      <div id="scene-host" class="scene-host"><img id="native-frame" class="native-frame" alt="Native MuJoCo body rendering" hidden><div id="native-loading" class="native-loading" role="status" hidden>Rendering in MuJoCo</div><div id="metric-scale-guide" class="metric-scale-guide" aria-label="Two metre world-space reference" hidden><span>2 m</span></div></div>
+      <div class="scene-heading"><span id="life-stage" class="eyebrow">BODY COHORT</span><h2 id="scene-title">Loading subject</h2><p id="scene-subtitle"></p></div>
+      <div class="camera-toolbar" role="group" aria-label="Camera view">
+        <button class="icon-button camera-button active" data-camera="front" aria-label="Front view" aria-pressed="true" data-tooltip="Front view"><i data-lucide="user-round"></i></button>
+        <button class="icon-button camera-button" data-camera="side" aria-label="Side view" aria-pressed="false" data-tooltip="Side view"><i data-lucide="panel-right"></i></button>
+        <button class="icon-button camera-button" data-camera="back" aria-label="Back view" aria-pressed="false" data-tooltip="Back view"><i data-lucide="rotate-3d"></i></button>
+        <button id="camera-follow" class="icon-button camera-follow-button active" type="button" aria-label="Follow horizontal motion" aria-pressed="true" data-tooltip="Fix camera in world"><i data-lucide="crosshair"></i></button>
+        <button id="camera-metric" class="icon-button active" type="button" aria-label="Shared metric framing" aria-pressed="true" data-tooltip="Frame each body individually"><i data-lucide="ruler"></i></button>
+        <span class="toolbar-divider"></span>
+        <button id="frame-button" class="icon-button" aria-label="Frame body" data-tooltip="Frame body"><i data-lucide="scan"></i></button>
+      </div>
+      <div class="scene-caption"><span id="bone-count">-- anatomical meshes</span><span class="caption-divider"></span><span id="joint-count">-- rig controls</span></div>
+      <div id="loading-overlay" class="loading-overlay" role="status" aria-live="polite"><span class="loading-spinner" aria-hidden="true"></span><span id="loading-label">Loading body assets</span></div>
+      <div id="error-overlay" class="error-overlay" role="alert" hidden><i data-lucide="circle-alert" aria-hidden="true"></i><h2>Body could not be loaded</h2><p id="error-message"></p><button id="retry-button" class="command-button"><i data-lucide="refresh-cw"></i>Retry</button></div>
+
+      <div class="playback" aria-label="Motion playback">
+        <div id="recorded-controls" class="playback-main">
+          <label class="motion-field"><span class="sr-only">Motion</span><select id="motion-select" disabled><option>Neutral</option></select></label>
+          <div class="transport"><button id="replay-button" class="icon-button" aria-label="Replay motion" data-tooltip="Replay" disabled><i data-lucide="rotate-ccw"></i></button><button id="play-button" class="icon-button play-button" aria-label="Play motion" data-tooltip="Play" disabled><i data-lucide="play"></i></button></div>
+          <div class="timeline"><input id="time-slider" class="range-input" type="range" min="0" max="1" step="0.001" value="0" aria-label="Motion position" disabled><output id="time-value">0:00 / 0:00</output></div>
+          <label class="speed-field"><span class="sr-only">Playback speed</span><select id="speed-select" aria-label="Playback speed"><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="1.5">1.5x</option><option value="2">2x</option></select></label>
+        </div>
+        <div id="physics-controls" class="physics-controls" hidden>
+          <span class="physics-mode-label">Passive gravity/contact</span>
+          <div class="transport"><button id="physics-reset" type="button" class="icon-button" aria-label="Reset physics" data-tooltip="Reset physics"><i data-lucide="rotate-ccw"></i></button><button id="physics-play" type="button" class="icon-button play-button" aria-label="Run physics" data-tooltip="Run physics"><i data-lucide="play"></i></button><button id="physics-push" type="button" class="icon-button" aria-label="Apply lateral impulse" data-tooltip="Apply lateral impulse"><i data-lucide="move-right"></i></button></div>
+          <label class="physics-mass"><span>Mass (kg)</span><input id="physics-mass" type="number" min="0.5" max="350" step="0.1" placeholder="Assumed" aria-label="Body mass in kilograms"></label>
+          <label class="physics-proxies"><input id="physics-proxies" type="checkbox"><span>Collision proxies</span></label>
+          <output id="physics-time">0.000 s</output>
+        </div>
+        <div class="playback-meta"><span><span class="motion-dot"></span><span id="renderer-status">Browser 3D / kinematic playback</span></span><span id="frame-value">Frame 1</span></div>
+        <div id="motion-source" class="motion-source" hidden><span>Retargeted recording</span><span class="motion-source-links"><a id="motion-source-link" target="_blank" rel="noopener"></a><a id="motion-license-link" target="_blank" rel="noopener" hidden>License</a></span></div>
+        <div id="physics-source" class="physics-source" hidden><span id="physics-mass-status">Mass estimate / not measured</span><span>Gravity and contacts / no balance controller</span></div>
+        <p id="physics-error" class="physics-error" role="alert" hidden></p>
+      </div>
+    </section>
+  </main>
+  <dialog id="containment-dialog" class="containment-dialog" aria-labelledby="containment-title" aria-describedby="containment-scope">
+    <header class="reference-heading"><div><span id="containment-subject" class="eyebrow">SELECTED BODY</span><h2 id="containment-title">Containment audit</h2></div><button id="containment-close" type="button" class="icon-button" aria-label="Close containment audit" data-tooltip="Close"><i data-lucide="x"></i></button></header>
+    <div class="containment-body">
+      <p id="containment-scope" class="containment-scope">Neutral and available recorded poses. Current passive-physics state is excluded.</p>
+      <div class="containment-status-row"><p id="containment-status" role="status" aria-live="polite">Not checked</p><button id="containment-download" type="button" class="icon-button" aria-label="Download containment report" data-tooltip="Download report" hidden><i data-lucide="download"></i></button></div>
+      <progress id="containment-progress" max="1" hidden aria-label="Containment audit progress"></progress>
+      <p id="containment-progress-label" class="containment-progress-label" hidden></p>
+      <p id="containment-error" class="generation-error" role="alert" hidden></p>
+      <div id="containment-results" hidden>
+        <dl class="containment-metrics">
+          <div><dt>Clearance violations</dt><dd id="containment-violations">--</dd></div>
+          <div><dt>Inferred exterior</dt><dd id="containment-exterior">--</dd></div>
+          <div><dt>Unresolved samples</dt><dd id="containment-unknown">--</dd></div>
+          <div><dt>Worst clearance</dt><dd id="containment-clearance">--</dd></div>
+          <div><dt>Checked poses / meshes</dt><dd id="containment-coverage">--</dd></div>
+          <div><dt>Raw triangle intersections</dt><dd id="containment-intersections">Not checked</dd></div>
+        </dl>
+        <p id="containment-criterion" class="containment-note"></p>
+        <p id="containment-method" class="containment-note"></p>
+        <p id="containment-parity" class="containment-note"></p>
+        <p id="containment-surface-bounds" class="containment-note"></p>
+        <details class="containment-regions"><summary>Query assumptions</summary><p id="containment-assumptions" class="containment-note"></p><p id="containment-coordinate-reference" class="containment-note"></p></details>
+        <details class="containment-regions"><summary id="containment-regions-label">Anatomical mesh results</summary><div class="containment-table-scroll"><table><thead><tr><th scope="col">Mesh</th><th scope="col">Clearance violations</th><th scope="col">Inferred exterior</th><th scope="col">Unresolved</th><th scope="col">Worst mm</th></tr></thead><tbody id="containment-region-rows"></tbody></table></div></details>
+      </div>
+      <p class="containment-boundary">Finite geometric checks, not certification of continuous-motion containment or anatomical accuracy.</p>
+    </div>
+    <footer class="containment-footer"><button id="containment-run" type="button" class="command-button"><i data-lucide="scan-search"></i>Run check</button><button id="containment-cancel" type="button" class="command-button" hidden><i data-lucide="x"></i>Cancel</button></footer>
+  </dialog>
+  <dialog id="measurement-reference" class="measurement-reference" aria-labelledby="reference-title" aria-describedby="reference-protocol">
+    <header class="reference-heading"><div><span class="eyebrow">MEASUREMENT REFERENCE</span><h2 id="reference-title">Skin dimension</h2></div><button id="reference-close" type="button" class="icon-button" aria-label="Close measurement reference" data-tooltip="Close"><i data-lucide="x"></i></button></header>
+    <div class="reference-body">
+      <figure class="reference-figure"><div id="reference-scene" class="reference-scene" aria-label="Selected skin with measurement location"></div><figcaption><span class="reference-swatch"></span><span id="reference-figure-label">Neutral skin surface</span></figcaption><div id="reference-loading" class="reference-loading" role="status">Loading measurement</div></figure>
+      <div class="reference-details"><p id="reference-protocol"></p><dl class="reference-values"><div><dt>Selected skin</dt><dd id="reference-measured">--</dd></div><div><dt>Input target</dt><dd id="reference-target">--</dd></div></dl><p id="reference-bilateral" class="reference-bilateral" hidden></p><p class="reference-boundary">Graphics-pose measurement, not a clinical tape-measure standard. Girth is the full perimeter, not the width.</p><p id="reference-range" class="reference-range"></p><div id="reference-sources" class="reference-sources" aria-label="Anthropometry sources" hidden></div><p id="reference-error" class="generation-error" role="alert" hidden></p></div>
+    </div>
+    <footer class="reference-footer"><span id="reference-subject"></span><div class="reference-navigation"><button id="reference-previous" type="button" class="icon-button" aria-label="Previous measurement" data-tooltip="Previous measurement"><i data-lucide="chevron-left"></i></button><output id="reference-position">-- / --</output><button id="reference-next" type="button" class="icon-button" aria-label="Next measurement" data-tooltip="Next measurement"><i data-lucide="chevron-right"></i></button></div></footer>
+  </dialog>
+</body>
+</html>

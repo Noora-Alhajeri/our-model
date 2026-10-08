@@ -1,0 +1,33 @@
+{
+ "schema": "muscle_activation_index_v1",
+ "motions": {
+  "backward_walk": {
+   "frames": 182,
+   "activation_mean": 0.016
+  },
+  "idle": {
+   "frames": 302,
+   "activation_mean": 0.007
+  },
+  "kick_steps": {
+   "frames": 182,
+   "activation_mean": 0.0172
+  },
+  "punch_steps": {
+   "frames": 182,
+   "activation_mean": 0.0195
+  },
+  "run": {
+   "frames": 122,
+   "activation_mean": 0.0211
+  },
+  "side_step": {
+   "frames": 182,
+   "activation_mean": 0.0148
+  },
+  "walk": {
+   "frames": 122,
+   "activation_mean": 0.0113
+  }
+ }
+}
